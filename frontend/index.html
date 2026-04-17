@@ -1,0 +1,3088 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动化多模态数据集制作系统</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 页面容器样式 */
+        .page-container {
+            display: none;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .page-container.active {
+            display: block;
+        }
+        
+        /* 数据管理页面专属样式 */
+        .data-page-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .data-page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            padding-bottom: 3rem;
+        }
+
+        /* 上传按钮区域 */
+        .upload-buttons-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-buttons-card {
+            background: transparent;
+            border: none;
+            padding: 0;
+            box-shadow: none;
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        /* 统计卡片区域 */
+        .stats-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 1rem;
+            box-shadow: var(--card-shadow);
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(46, 125, 50, 0.1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+
+        .stat-card.primary::before {
+            background: linear-gradient(180deg, var(--primary-color), var(--primary-dark));
+        }
+
+        .stat-card.success::before {
+            background: linear-gradient(180deg, var(--success-color), var(--primary-color));
+        }
+
+        .stat-card.warning::before {
+            background: linear-gradient(180deg, var(--warning-color), #d97706);
+        }
+
+        .stat-card.info::before {
+            background: linear-gradient(180deg, var(--info), #1d4ed8);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .stat-card.primary .stat-icon {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-light));
+            color: var(--primary-dark);
+        }
+
+        .stat-card.success .stat-icon {
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+            color: #1e40af;
+        }
+
+        .stat-card.warning .stat-icon {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            color: #92400e;
+        }
+
+        .stat-card.info .stat-icon {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-light));
+            color: var(--primary-dark);
+        }
+
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+        }
+
+        .stat-trend.up {
+            background: #dcfce7;
+            color: var(--primary-700);
+        }
+
+        .stat-trend.down {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        /* 筛选和搜索区 */
+        .filter-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(46, 125, 50, 0.1);
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 0.5rem;
+        }
+
+        .filter-select,
+        .filter-input {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            background: var(--gray-50);
+            transition: all var(--transition-fast);
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            background: white;
+            box-shadow: 0 0 0 3px var(--primary-100);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .search-input {
+            flex: 1;
+        }
+
+        /* 数据表格区 */
+        .table-section {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+            border: 1px solid rgba(46, 125, 50, 0.1);
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-light));
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .table-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--gray-800);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-sm {
+            padding: 0.4rem 0.875rem;
+            font-size: 0.75rem;
+        }
+
+        .data-table-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            height: 550px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: var(--gray-50);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .data-table td {
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .data-table tr:hover td {
+            background: var(--primary-light);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.625rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-badge.active {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+        }
+
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .row-actions {
+            display: flex;
+            gap: 0.375rem;
+        }
+
+        .row-action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .row-action-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* 分页 */
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background: var(--gray-50);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .pagination-info {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .page-btn {
+            width: 36px;
+            height: 36px;
+            border: 1.5px solid var(--gray-300);
+            border-radius: var(--radius-sm);
+            background: white;
+            color: var(--gray-700);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .page-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 最近导入的文件 */
+        .import-history-section {
+            margin-bottom: 1.5rem;
+        }
+        
+        /* 人工复审页面样式 */
+        .review-page-container {
+            display: flex;
+            height: calc(100vh - 64px);
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .review-page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        /* 人工复审页面专属样式 */
+        .review-page-sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid var(--border-color);
+            padding: 1.8rem 1.2rem;
+            overflow-y: auto;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .review-page-main-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .review-page-sidebar-section {
+            margin-bottom: 2.2rem;
+        }
+
+        .review-page-sidebar-section h3 {
+            font-size: 0.9rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .review-page-sidebar-section h3 i {
+            font-size: 1rem;
+        }
+
+        .review-page-sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 0.9rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .review-page-sidebar-item:hover {
+            background-color: var(--primary-light);
+            border-color: var(--primary-color);
+            transform: translateX(5px);
+        }
+
+        .review-page-sidebar-item.active {
+            background-color: var(--primary-light);
+            color: var(--primary-color);
+            font-weight: 600;
+            border-color: var(--primary-color);
+            box-shadow: 0 3px 10px rgba(46, 125, 50, 0.1);
+        }
+
+        .review-page-sidebar-item i {
+            margin-right: 12px;
+            width: 20px;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .review-page-badge {
+            display: inline-block;
+            padding: 0.3rem 0.7rem;
+            font-size: 0.8rem;
+            border-radius: 20px;
+            margin-left: auto;
+            font-weight: 600;
+        }
+
+        .review-page-badge-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .review-page-badge-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .review-page-badge-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .review-page-review-container {
+            display: flex;
+            gap: 1.5rem;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .review-page-left-column, .review-page-right-column {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            overflow-y: auto;
+            border: 1px solid rgba(46, 125, 50, 0.1);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .review-page-left-column:hover, .review-page-right-column:hover {
+            box-shadow: var(--hover-shadow);
+        }
+
+        .review-page-left-column {
+            flex: 5;
+            min-width: 0;
+        }
+
+        .review-page-right-column {
+            flex: 5;
+            min-width: 0;
+        }
+
+        .review-page-column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary-light);
+            flex-shrink: 0;
+        }
+
+        .review-page-column-header h2 {
+            font-size: 1.2em;
+            color: var(--primary-dark);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .review-page-column-header h2 i {
+            background: var(--primary-light);
+            padding: 10px;
+            border-radius: 10px;
+            color: var(--primary-color);
+        }
+
+        .review-page-qa-id {
+            background-color: var(--primary-light);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: var(--primary-dark);
+            font-weight: 600;
+            border: 1px solid rgba(46, 125, 50, 0.2);
+        }
+
+        .review-page-image-section {
+            margin-bottom: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .review-page-image-section h3 {
+            font-size: 0.9rem;
+            color: var(--primary-dark);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .review-page-image-section h3 i {
+            color: var(--primary-color);
+        }
+
+        .review-page-image-display {
+            border: 2px solid var(--primary-light);
+            border-radius: 12px;
+            padding: 1rem;
+            background: linear-gradient(to bottom, #f9fdf9, #f5faf5);
+            text-align: center;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .review-page-image-placeholder {
+            text-align: center;
+            color: var(--text-light);
+            padding: 1rem 0;
+        }
+
+        .review-page-image-placeholder i {
+            font-size: 2rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            opacity: 0.7;
+        }
+
+        .review-page-image-placeholder h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-dark);
+        }
+
+        .review-page-image-placeholder p {
+            font-size: 0.85rem;
+            width: 350px;
+            margin: 0 auto;
+            line-height: 1.4;
+        }
+
+        .review-page-image-container {
+            max-width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .review-page-image-container img {
+            width: 100%;
+            height: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            display: block;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .review-page-image-container img:hover {
+            transform: scale(1.02);
+        }
+
+        .review-page-image-source {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 0.8rem;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .review-page-image-actions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+
+        .review-page-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .review-page-btn-sm {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        .review-page-btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .review-page-btn-danger:hover {
+            background-color: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.2);
+        }
+
+        .review-page-image-counter {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            font-weight: normal;
+            margin-left: 0.5rem;
+            background: var(--primary-light);
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+        }
+
+        .review-page-thumbnail-section {
+            background: #f9f9f9;
+            border-radius: 10px;
+            padding: 0.5rem;
+            height: 150px;
+            border: 1px solid var(--border-color);
+        }
+
+        .review-page-thumbnail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.2rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--primary-dark);
+        }
+
+        .review-page-thumbnail-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.5rem 0.5rem 0.5rem 0.5rem;
+            width: 100%;
+            white-space: nowrap;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .review-page-thumbnail-list {
+            display: inline-flex;
+            flex-direction: row;
+            gap: 12px;
+            padding: 0 5px;
+            min-height: 80px;
+            align-items: center;
+            width: auto;
+        }
+
+        .review-page-thumbnail-item {
+            flex: 0 0 auto;
+            width: 100px;
+            height: 80px;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            opacity: 0.9;
+            transition: all 0.3s ease;
+            position: relative;
+            background: #f0f0f0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .review-page-thumbnail-item:hover {
+            opacity: 1;
+            transform: translateY(-3px);
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+        }
+
+        .review-page-thumbnail-item.active {
+            border-color: var(--primary-color);
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        }
+
+        .review-page-thumbnail-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .review-page-thumbnail-item .review-page-thumbnail-index {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 0.7rem;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            z-index: 2;
+        }
+
+        .review-page-thumbnail-loading {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+        }
+
+        .review-page-thumbnail-loading i {
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            opacity: 0.7;
+            animation: spin 2s linear infinite;
+        }
+
+        .review-page-no-thumbnails {
+            text-align: center;
+            color: var(--text-light);
+            font-style: italic;
+            padding: 1.5rem;
+            width: 100%;
+            white-space: normal;
+        }
+
+        .review-page-image-error {
+            width: 100%;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+            border-radius: 8px;
+            color: var(--text-light);
+        }
+
+        .review-page-image-error i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #ccc;
+        }
+
+        .review-page-image-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 1rem;
+        }
+
+        .review-page-image-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ddd;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .review-page-image-indicator.active {
+            background: var(--primary-color);
+            transform: scale(1.2);
+        }
+
+        .review-page-qa-content {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .review-page-question-section, .review-page-answer-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .review-page-section-label {
+            font-size: 0.95rem;
+            color: var(--primary-color);
+            margin-bottom: 0.8rem;
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .review-page-section-label i {
+            margin-right: 8px;
+            font-size: 1.1rem;
+        }
+
+        .review-page-content-box {
+            background-color: #f9fdf9;
+            border-radius: 10px;
+            padding: 1rem;
+            border-left: 4px solid var(--border-color);
+            line-height: 1.5;
+            font-size: 0.85rem;
+        }
+
+        .review-page-original-qa .review-page-content-box {
+            border-left-color: #90A4AE;
+            background-color: #f8f9fa;
+        }
+
+        .review-page-optimized-qa .review-page-content-box {
+            border-left-color: var(--primary-color);
+        }
+
+        .review-page-content-box.editable {
+            border: 1px solid var(--border-color);
+            min-height: 350px;
+            background: white;
+            transition: all 0.3s ease;
+            outline: none;
+            overflow-y: auto;
+        }
+
+        .review-page-content-box.editable:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+        }
+
+        .review-page-content-box.editable ul,
+        .review-page-content-box.editable ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .review-page-content-box.editable li {
+            margin-bottom: 0.3rem;
+        }
+
+        .review-page-content-box.editable strong {
+            color: var(--primary-dark);
+        }
+
+        .review-page-review-toolbar {
+            background: linear-gradient(to bottom, #f9fdf9, #f5faf5);
+            border-radius: 10px;
+            padding: 1.2rem;
+            margin-top: 1.2rem;
+            border: 1px solid rgba(46, 125, 50, 0.1);
+            flex-shrink: 0;
+        }
+
+        .review-page-toolbar-section {
+            margin-bottom: 1.2rem;
+        }
+
+        .review-page-toolbar-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .review-page-toolbar-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .review-page-toolbar-title i {
+            color: var(--primary-color);
+            font-size: 0.9rem;
+        }
+
+        .review-page-status-buttons {
+            display: flex;
+            gap: 0.8rem;
+        }
+
+        .review-page-status-btn {
+            flex: 1;
+            padding: 0.8rem 0.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+        }
+
+        .review-page-status-btn i {
+            font-size: 1rem;
+        }
+
+        .review-page-status-btn.approve {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
+        }
+
+        .review-page-status-btn.approve:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+        }
+
+        .review-page-status-btn.revise {
+            background: linear-gradient(135deg, #FFB74D, #FF9800);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+        }
+
+        .review-page-status-btn.revise:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3);
+        }
+
+        .review-page-action-tools {
+            display: flex;
+            gap: 0.8rem;
+        }
+
+        .review-page-action-btn {
+            padding: 0.6rem 0.8rem;
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: 500;
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            flex: 1;
+            font-size: 0.85rem;
+            min-height: 36px;
+        }
+
+        .review-page-action-btn:hover {
+            background-color: var(--primary-light);
+            border-color: var(--primary-color);
+            color: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .review-page-action-btn.primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        .review-page-action-btn.primary:hover {
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        }
+
+        .review-page-shortcut-hint {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.8rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .review-page-image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .review-page-image-modal.active {
+            display: flex;
+            animation: modalFadeIn 0.3s ease-out;
+        }
+
+        .review-page-image-modal-content {
+            max-width: 90%;
+            max-height: 90vh;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 25px 100px rgba(0, 0, 0, 0.6);
+            padding: 0;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .review-page-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .review-page-modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .review-page-modal-title::before {
+            content: '\f03e';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 1.2rem;
+        }
+
+        .review-page-modal-close {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .review-page-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .review-page-modal-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: #1a1a1a;
+            min-height: 400px;
+            position: relative;
+        }
+
+        .review-page-modal-image-container {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .review-page-modal-image-container img {
+            max-width: 100%;
+            max-height: calc(90vh - 200px);
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        .review-page-modal-footer {
+            padding: 1rem 1.5rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .review-page-modal-filename {
+            font-size: 0.85rem;
+            color: #666;
+            text-align: center;
+            margin-bottom: 1rem;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .review-page-modal-nav {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .review-page-modal-nav-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        }
+
+        .review-page-modal-nav-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(46, 125, 50, 0.4);
+        }
+
+        .review-page-modal-nav-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .review-page-modal-nav-btn:disabled {
+            background: #e0e0e0;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+
+        .review-page-statistics-container {
+            background: linear-gradient(135deg, #f5fbff 0%, #e8f4f8 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #b3e0ff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .review-page-stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px dashed #cce6ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 6px;
+            margin: 0 -0.5rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+
+        .review-page-stat-item:hover {
+            background: rgba(46, 125, 50, 0.08);
+            transform: translateX(3px);
+        }
+
+        .review-page-stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .review-page-stat-label {
+            font-weight: 600;
+            color: #2e7d32;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .review-page-stat-value {
+            font-weight: 700;
+            color: #1b5e20;
+            font-size: 1.1rem;
+            background: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .review-page-stat-item:hover .review-page-stat-value {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .review-page-stat-badge {
+            display: inline-block;
+            padding: 0.25rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .review-page-stat-badge.pending {
+            background-color: #ECEFF1;
+            color: #546E7A;
+        }
+
+        .review-page-stat-badge.approved {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .review-page-stat-badge.modified {
+            background-color: #FFF3E0;
+            color: #EF6C00;
+        }
+
+        .review-page-stat-progress {
+            margin-top: 1rem;
+        }
+
+        .review-page-progress-bar {
+            width: 100%;
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 0.8rem 0;
+        }
+
+        .review-page-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #2E7D32);
+            border-radius: 5px;
+            transition: width 0.4s ease;
+        }
+
+        .review-page-progress-text {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .review-page-upload-section {
+            background: white;
+            border-radius: 12px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(46, 125, 50, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .review-page-upload-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .review-page-upload-header h3 {
+            font-size: 1.2rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+        }
+
+        .review-page-upload-header h3 i {
+            color: var(--primary-color);
+        }
+
+        .review-page-upload-btn {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+        }
+
+        .review-page-upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 125, 50, 0.3);
+        }
+
+        .review-page-upload-btn:active {
+            transform: translateY(0);
+        }
+
+        .review-page-upload-info {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+        }
+
+        .review-page-fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .review-page-notification-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            color: #444;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1001;
+            max-width: 300px;
+            border-left: 4px solid #2E7D32;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .review-page-review-container {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .review-page-sidebar {
+                width: 240px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .review-page-sidebar {
+                width: 100%;
+                order: 2;
+            }
+            
+            .review-page-status-buttons {
+                flex-direction: column;
+            }
+            
+            .review-page-action-tools {
+                flex-direction: column;
+            }
+            
+            .review-page-main-content {
+                padding: 1rem;
+            }
+            
+            .review-page-left-column, .review-page-right-column {
+                padding: 1.2rem;
+            }
+            
+            .review-page-thumbnail-list {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .review-page-image-modal-content {
+                max-width: 90%;
+                max-height: 80%;
+                padding: 1rem;
+            }
+        }
+        
+        /* 审核历史页面样式 */
+        .history-page-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .history-page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        /* 审核历史页面专属样式 */
+        .history-page-header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .history-page-header h1 {
+            color: var(--primary-dark);
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .history-page-header p {
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        /* 工具栏 */
+        .history-page-toolbar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.2rem;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-page-filter-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .history-page-filter-label {
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .history-page-filter-select {
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .history-page-filter-select:hover {
+            border-color: var(--primary-color);
+        }
+
+        .history-page-action-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .history-page-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            gap: 8px;
+        }
+
+        .history-page-btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+        }
+
+        .history-page-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        }
+
+        .history-page-btn-secondary {
+            background: white;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+
+        .history-page-btn-secondary:hover {
+            background: var(--primary-light);
+        }
+
+        /* 历史记录列表 */
+        .history-page-history-list {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: var(--card-shadow);
+        }
+
+        .history-page-history-item {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .history-page-history-item:hover {
+            box-shadow: var(--hover-shadow);
+            border-color: var(--primary-color);
+        }
+
+        .history-page-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .history-page-history-info {
+            flex: 1;
+        }
+
+        .history-page-history-question {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .history-page-history-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .history-page-history-status {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .history-page-status-approved {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .history-page-status-modified {
+            background: #FFF3E0;
+            color: #EF6C00;
+        }
+
+        .history-page-status-pending {
+            background: #ECEFF1;
+            color: #546E7A;
+        }
+
+        /* 对比区域 */
+        .history-page-comparison-section {
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+        }
+
+        .history-page-comparison-header {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-page-comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .history-page-comparison-column {
+            background: var(--light-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+            border-left: 4px solid var(--border-color);
+        }
+
+        .history-page-comparison-column.original {
+            border-left-color: #90A4AE;
+        }
+
+        .history-page-comparison-column.modified {
+            border-left-color: var(--primary-color);
+        }
+
+        .history-page-comparison-label {
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .history-page-comparison-content {
+            line-height: 1.6;
+        }
+
+        /* 空状态 */
+        .history-page-empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-light);
+        }
+
+        .history-page-empty-state i {
+            font-size: 4rem;
+            color: var(--primary-color);
+            opacity: 0.5;
+            margin-bottom: 1.5rem;
+        }
+
+        .history-page-empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-dark);
+        }
+
+        .history-page-empty-state p {
+            font-size: 1rem;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .history-page-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            .history-page-filter-section {
+                justify-content: space-between;
+            }
+
+            .history-page-comparison-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .history-page-history-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .history-page-history-meta {
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+        }
+
+        /* 缩略图相关样式 */
+        .thumbnail-item {
+            flex: 0 0 auto;
+            width: 150px;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            opacity: 0.9;
+            transition: all 0.3s ease;
+            position: relative;
+            background: #f0f0f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .thumbnail-item:hover {
+            opacity: 1;
+            transform: translateY(-3px);
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--primary-color);
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .thumbnail-item .thumbnail-index {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 0.7rem;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            z-index: 2;
+        }
+
+        /* 缩略图加载状态 */
+        .thumbnail-loading {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+        }
+
+        .thumbnail-loading i {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            opacity: 0.7;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .no-thumbnails {
+            text-align: center;
+            color: var(--text-light);
+            font-style: italic;
+            padding: 2rem;
+            width: 100%;
+            white-space: normal;
+        }
+
+        /* 图片加载错误样式 */
+        .image-error {
+            width: 100%;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #f9f9f9;
+            border-radius: 8px;
+            color: var(--text-light);
+        }
+
+        .image-error i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #ccc;
+        }
+
+        /* 图片数量指示器 */
+        .image-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 1rem;
+        }
+
+        .image-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ddd;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .image-indicator.active {
+            background: var(--primary-color);
+            transform: scale(1.2);
+        }
+
+        /* 历史记录相关样式 */
+        .history-item {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .history-item:hover {
+            box-shadow: var(--hover-shadow);
+            border-color: var(--primary-color);
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .history-info {
+            flex: 1;
+        }
+
+        .history-question {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .history-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .history-status {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .status-approved {
+            background: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .status-modified {
+            background: #FFF3E0;
+            color: #EF6C00;
+        }
+
+        .status-pending {
+            background: #ECEFF1;
+            color: #546E7A;
+        }
+
+        /* 对比区域 */
+        .comparison-section {
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+        }
+
+        .comparison-header {
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .comparison-column {
+            background: var(--light-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+            border-left: 4px solid var(--border-color);
+        }
+
+        .comparison-column.original {
+            border-left-color: #90A4AE;
+        }
+
+        .comparison-column.modified {
+            border-left-color: var(--primary-color);
+        }
+
+        .comparison-label {
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .comparison-content {
+            line-height: 1.6;
+        }
+
+        /* 通知消息样式 */
+        .notification-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            color: #444;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1001;
+            max-width: 300px;
+            border-left: 4px solid #2E7D32;
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fas fa-brain"></i>
+            自动化多模态数据集制作系统
+        </div>
+        
+        <ul class="nav-menu">
+            <li><a href="#" data-page="index" class="active"><i class="fas fa-home"></i> 系统首页</a></li>
+            <li><a href="#" data-page="data-management"><i class="fas fa-database"></i> 数据管理</a></li>
+            <li><a href="#" data-page="manual-review"><i class="fas fa-user-check"></i> 人工复审</a></li>
+            <li><a href="#" data-page="review-history"><i class="fas fa-history"></i> 审核历史</a></li>
+        </ul>
+        
+        <div class="user-menu">
+            <div class="user-avatar">用户</div>
+        </div>
+    </nav>
+    
+    <!-- 系统首页 -->
+    <div id="index" class="page-container active">
+        <!-- 页面容器 -->
+        <div class="app-container">
+
+            <!-- 主内容区 - 三栏布局 -->
+            <main class="main-content">
+                <!-- 第一栏：数据源配置 -->
+                <section class="panel data-source-panel">
+                    <div class="panel-header">
+                        <div class="panel-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <h2>数据源配置</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <!-- 数据库连接配置 -->
+                        <div class="config-section">
+                            <h3 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span class="section-icon">🔗</span>
+                                    数据库连接
+                                </div>
+                                <button id="btnResetDbConfig" class="btn btn-secondary btn-sm">
+                                    <span class="btn-icon">🔄</span>
+                                    重置配置
+                                </button>
+                            </h3>
+                            
+                            <form id="dbConfigForm" class="config-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="dbHost">主机地址</label>
+                                        <input type="text" id="dbHost" name="host" value="192.168.200.88" placeholder="例如：localhost" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dbPort">端口</label>
+                                        <input type="number" id="dbPort" name="port" value="5432" placeholder="例如：3306" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="dbUser">用户名</label>
+                                        <input type="text" id="dbUser" name="user" value="postgres" placeholder="数据库用户名" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dbPassword">密码</label>
+                                        <input type="password" id="dbPassword" name="password" placeholder="数据库密码" required>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="dbName">数据库名</label>
+                                        <input type="text" id="dbName" name="database" value="data-center" placeholder="数据库名称" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="dbSchema">Schema</label>
+                                        <input type="text" id="dbSchema" name="schema" value="test" placeholder="schema 名称" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <span class="btn-icon">🔌</span>
+                                    连接数据库
+                                </button>
+                            </form>
+                            
+                            <div id="dbStatus" class="connection-status"></div>
+                        </div>
+
+                        <div class="divider">
+                            <span>或</span>
+                        </div>
+
+                        <!-- Excel 文件上传 -->
+                        <div class="config-section">
+                            <h3 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span class="section-icon">📄</span>
+                                    Excel 文件上传
+                                </div>
+                                <button id="btnResetUpload" class="btn btn-secondary btn-sm">
+                                    <span class="btn-icon">🔄</span>
+                                    重置上传
+                                </button>
+                            </h3>
+                            
+                            <div class="upload-hint-section">
+                                <p class="upload-hint">请分别上传三个 Excel 文件，支持多次上传</p>
+                                <p class="upload-requirement">文件名需包含：问题/question、回复/replies、图片/image 关键词</p>
+                            </div>
+                            
+                            <!-- 三个独立上传区域 -->
+                            <div class="multi-upload-container">
+                                <!-- 问题表上传 -->
+                                <div class="upload-item" id="uploadItemQuestions">
+                                    <div class="upload-area upload-area-small" data-type="questions">
+                                        <input type="file" class="excel-file-input" accept=".xlsx,.xls" hidden>
+                                        <div class="upload-content">
+                                            <div class="upload-icon-wrapper">
+                                                <span class="table-badge badge-questions">问题表</span>
+                                            </div>
+                                            <p class="upload-text">点击上传问题表</p>
+                                            <p class="upload-hint">questions / 问题</p>
+                                        </div>
+                                    </div>
+                                    <div class="upload-status-indicator" id="statusQuestions">
+                                        <span class="status-dot"></span>
+                                        <span class="status-label">未上传</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 回复表上传 -->
+                                <div class="upload-item" id="uploadItemReplies">
+                                    <div class="upload-area upload-area-small" data-type="replies">
+                                        <input type="file" class="excel-file-input" accept=".xlsx,.xls" hidden>
+                                        <div class="upload-content">
+                                            <div class="upload-icon-wrapper">
+                                                <span class="table-badge badge-replies">回复表</span>
+                                            </div>
+                                            <p class="upload-text">点击上传回复表</p>
+                                            <p class="upload-hint">replies / 回复</p>
+                                        </div>
+                                    </div>
+                                    <div class="upload-status-indicator" id="statusReplies">
+                                        <span class="status-dot"></span>
+                                        <span class="status-label">未上传</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- 图片表上传 -->
+                                <div class="upload-item" id="uploadItemImages">
+                                    <div class="upload-area upload-area-small" data-type="images">
+                                        <input type="file" class="excel-file-input" accept=".xlsx,.xls" hidden>
+                                        <div class="upload-content">
+                                            <div class="upload-icon-wrapper">
+                                                <span class="table-badge badge-images">图片表</span>
+                                            </div>
+                                            <p class="upload-text">点击上传图片表</p>
+                                            <p class="upload-hint">images / 图片</p>
+                                        </div>
+                                    </div>
+                                    <div class="upload-status-indicator" id="statusImages">
+                                        <span class="status-dot"></span>
+                                        <span class="status-label">未上传</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 上传状态总览 -->
+                            <div class="upload-summary" id="uploadSummary">
+                                <div class="summary-item">
+                                    <span class="summary-label">问题表:</span>
+                                    <span class="summary-count" id="questionsCount">0</span> 条记录
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">回复表:</span>
+                                    <span class="summary-count" id="repliesCount">0</span> 条记录
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">图片表:</span>
+                                    <span class="summary-count" id="imagesCount">0</span> 条记录
+                                </div>
+                            </div>
+                            
+
+                        </div>
+                    </section>
+
+                <!-- 第二栏：评分与导出 -->
+                <section class="panel scoring-panel">
+                    <div class="panel-header">
+                        <div class="panel-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="20" x2="12" y2="10"></line>
+                                <line x1="18" y1="20" x2="18" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="16"></line>
+                            </svg>
+                        </div>
+                        <h2>评分与导出</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <!-- 评分规则说明（紧凑版） -->
+                        <div class="scoring-rules compact">
+                            <h3 class="section-title">
+                                <span class="section-icon">📋</span>
+                                评分规则
+                            </h3>
+                            
+                            <div class="rules-container compact">
+                                <div class="rule-card small">
+                                    <div class="rule-header small">
+                                        <div class="rule-badge badge-accepted small">✓</div>
+                                        <h4>采纳状态</h4>
+                                    </div>
+                                    <div class="rule-score small">+0.4</div>
+                                    <div class="rule-desc small">采纳则加分，不采纳则不加分</div>
+                                </div>
+                                
+                                <div class="rule-card small">
+                                    <div class="rule-header small">
+                                        <div class="rule-badge badge-user small">👤</div>
+                                        <h4>用户身份</h4>
+                                    </div>
+                                    <div class="rule-score-tier small">
+                                        <span class="tier-item small">专家 +0.3</span>
+                                        <span class="tier-item small">达人 +0.2</span>
+                                        <span class="tier-item small">普通 +0.1</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="rule-card small">
+                                    <div class="rule-header small">
+                                        <div class="rule-badge badge-content small">📝</div>
+                                        <h4>内容详实度</h4>
+                                    </div>
+                                    <div class="rule-score-tier small">
+                                        <span class="tier-item small">&gt;100 +0.3</span>
+                                        <span class="tier-item small">50-100 +0.2</span>
+                                        <span class="tier-item small">20-50 +0.1</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 评分操作区 -->
+                        <div class="scoring-action">
+                            <button id="btnScore" class="btn btn-success btn-large btn-block" disabled>
+                                <span class="btn-icon">⚡</span>
+                                开始评分
+                            </button>
+                            
+                            <!-- 评分进度 -->
+                            <div id="scoringProgress" class="scoring-progress hidden">
+                                <div class="progress-info">
+                                    <span class="progress-text">正在评分...</span>
+                                    <span class="progress-percent">0%</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="progress-stats">
+                                    <span class="stat-item">已处理：<strong id="processedCount">0</strong></span>
+                                    <span class="stat-item">总计：<strong id="dashboardTotalCount">0</strong></span>
+                                </div>
+                            </div>
+                            
+                            <!-- 评分结果 -->
+                            <div id="scoringResult" class="scoring-result hidden"></div>
+                        </div>
+                        
+                        <!-- 格式预览 -->
+                        <div class="format-preview" style="height: auto; max-height: none;">
+                            <div class="preview-header">
+                                <span class="preview-title">格式示例</span>
+                                <span class="preview-badge">JSON</span>
+                            </div>
+                            <pre class="preview-code" style="max-height: none; overflow: visible;"><code>{  "id": "qa_1920038098029314050",
+  "image": [
+    "e23282eb4dba45c38a.jpeg",
+    "6b20b9dc7a9741e981.jpeg"
+  ],
+  "conversations": [
+    {
+      "from": "human",
+      "value": "&lt;image&gt; &lt;image&gt; 图中甜瓜叶片..."
+    },
+    {
+      "from": "gpt",
+      "value": "诊断结论：该症状高度疑似..."
+    }
+  ]
+}</code></pre>
+                        </div>
+                        
+
+                    </div>
+                </section>
+
+                <!-- 第三栏：优化问答对 -->
+                <section class="panel optimize-panel">
+                    <div class="panel-header">
+                        <div class="panel-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <h2>优化问答对</h2>
+                    </div>
+                    
+                    <div class="panel-body">
+                        <!-- API 配置 -->
+                        <div class="api-config">
+                            <h3 class="section-title">
+                                <span class="section-icon">🔧</span>
+                                API 配置
+                            </h3>
+                            
+                            <div class="api-config-form">
+                                <div class="form-group">
+                                    <label for="apiKey">DASHSCOPE API Key</label>
+                                    <input type="text" id="apiKey" class="form-control" placeholder="输入 API Key">
+                                </div>
+                                <div class="form-group">
+                                    <label for="apiBaseUrl">DASHSCOPE Base URL</label>
+                                    <input type="text" id="apiBaseUrl" class="form-control" placeholder="输入 Base URL" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 模型选择 -->
+                        <div class="model-selection">
+                            <h3 class="section-title">
+                                <span class="section-icon">🤖</span>
+                                模型选择
+                            </h3>
+                            
+                            <div class="model-selector">
+                                <!-- 文本模型选择 -->
+                                <div class="form-group">
+                                    <label for="textModelInput">文本模型</label>
+                                    <div class="model-input-container">
+                                        <input type="text" id="textModelInput" class="form-control" value="qwen3" placeholder="输入或选择模型名">
+                                        <div class="model-suggestions" id="textModelSuggestions">
+                                            <div class="suggestion-item" data-value="qwen3.5-plus">qwen3.5-plus</div>
+                                            <div class="suggestion-item" data-value="qwen3.5">qwen3.5</div>
+                                            <div class="suggestion-item" data-value="qwen3-max">qwen3-max</div>
+                                            <div class="suggestion-item" data-value="qwen3.5-flash">qwen3.5-flash</div> 
+                                        </div>
+                                    </div>
+                                    <!-- 文本模型提示词配置按钮 -->
+                                    <div class="prompt-config-buttons model-specific">
+                                        <button id="btnTextQuestionPrompt" class="btn btn-secondary btn-sm">
+                                            <span>📝</span> 问题优化提示词
+                                        </button>
+                                        <button id="btnTextAnswerPrompt" class="btn btn-secondary btn-sm">
+                                            <span>📝</span> 回答优化提示词
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- 多模态模型选择 -->
+                                <div class="form-group">
+                                    <label for="vlModelInput">多模态模型 (含 VL)</label>
+                                    <div class="model-input-container">
+                                        <input type="text" id="vlModelInput" class="form-control" value="qwen3-vl" placeholder="输入或选择模型名">
+                                        <div class="model-suggestions" id="vlModelSuggestions">
+                                            <div class="suggestion-item" data-value="qwen3-vl-plus">qwen3-vl-plus</div>
+                                            <div class="suggestion-item" data-value="qwen3-vl-flash">qwen3-vl-flash</div>
+                                            <div class="suggestion-item" data-value="qwen-image-2.0">qwen-image-2.0</div>   
+                                            <div class="suggestion-item" data-value="qwen-image-2.0-pro">qwen-image-2.0-pro</div>
+                                            <div class="suggestion-item" data-value="qwen-image-max">qwen-image-max</div>
+                                            <div class="suggestion-item" data-value="qwen-image-plus">qwen-image-plus</div>
+                                            <div class="suggestion-item" data-value="qwen-image-edit-max">qwen-image-edit-max</div>
+                                            <div class="suggestion-item" data-value="qwen-image-edit-plus">qwen-image-edit-plus</div>
+                                            <div class="suggestion-item" data-value="z-image-turbo">z-image-turbo</div>
+                                            <div class="suggestion-item" data-value="wan-12v">wan-12v</div>
+                                        </div>
+                                    </div>
+                                    <!-- 多模态模型提示词配置按钮 -->
+                                    <div class="prompt-config-buttons model-specific">
+                                        <button id="btnVlQuestionPrompt" class="btn btn-secondary btn-sm">
+                                            <span>📝</span> 问题优化提示词
+                                        </button>
+                                        <button id="btnVlAnswerPrompt" class="btn btn-secondary btn-sm">
+                                            <span>📝</span> 回答优化提示词
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 优化操作区 -->
+                        <div class="optimize-action">
+                            <div style="display: flex; gap: 1rem;">
+                                <button id="btnOptimizeTest" class="btn btn-secondary btn-large" disabled style="flex: 1;">
+                                    <span class="btn-icon">🧪</span>
+                                    优化测试
+                                </button>
+                                <button id="btnOptimize" class="btn btn-primary btn-large" disabled style="flex: 1;">
+                                    <span class="btn-icon">✨</span>
+                                    开始优化
+                                </button>
+                            </div>
+                            
+                            <!-- 优化进度 -->
+                            <div id="optimizeProgress" class="optimize-progress hidden">
+                                <div class="spinner"></div>
+                                <span class="progress-text">正在优化问答对...</span>
+                            </div>
+                            
+                            <!-- 优化结果 -->
+                            <div id="optimizeResult" class="optimize-result hidden">
+                                <h4>优化结果</h4>
+                                <div class="result-content"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 相似度分析操作区 -->
+                        <div class="similarity-action" style="margin-top: 1.5rem;">
+                            <button id="btnAnalyzeSimilarity" class="btn btn-secondary btn-large btn-block" disabled>
+                                <span class="btn-icon">🔍</span>
+                                分析相似度
+                            </button>
+                            
+                            <!-- 相似度分析进度 -->
+                            <div id="similarityProgress" class="optimize-progress hidden">
+                                <div class="spinner"></div>
+                                <span class="progress-text">正在分析相似度...</span>
+                            </div>
+                            
+                            <!-- 相似度分析结果 -->
+                            <div id="similarityResult" class="optimize-result hidden">
+                                <h4>相似度分析结果</h4>
+                                <div class="result-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- 数据预览面板（可折叠） -->
+            <div class="preview-drawer" id="previewDrawer">
+                <div class="drawer-header">
+                    <h3>数据预览</h3>
+                    <button class="btn-close" id="closePreview">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="drawer-body">
+                    <div class="tabs">
+                        <button class="tab active" data-tab="questions">问题表</button>
+                        <button class="tab" data-tab="replies">回复表</button>
+                        <button class="tab" data-tab="images">图片表</button>
+                    </div>
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="questionsTab">
+                            <div class="table-container">
+                                <table class="data-table" id="questionsTable"></table>
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="repliesTab">
+                            <div class="table-container">
+                                <table class="data-table" id="repliesTable"></table>
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="imagesTab">
+                            <div class="table-container">
+                                <table class="data-table" id="imagesTable"></table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 数据管理页面 -->
+    <div id="data-management" class="page-container">
+        <div class="data-page-container">
+            <div class="data-page-content">
+                <!-- 数据文件版块 -->
+                <section class="filter-section import-history-section">
+                    <div class="filter-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <h3 style="font-size: 1rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 0.5rem;">
+                                    <i class="fas fa-file-alt"></i> 数据文件
+                                </h3>
+                                <button class="btn btn-primary btn-sm" onclick="showLocalUploadModal()">
+                                    <i class="fas fa-folder-open"></i> 本地上传
+                                </button>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="clearImportHistory()">
+                                <i class="fas fa-trash"></i> 清空历史
+                            </button>
+                        </div>
+                        <div id="importHistory" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                            <div style="text-align: center; padding: 2rem; color: var(--gray-500); grid-column: 1 / -1;">
+                                <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                                <p>暂无数据文件</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 统计概览 -->
+                <section class="stats-section">
+                    <div class="stats-grid">
+                        <div class="stat-card primary">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">12,847</div>
+                            <div class="stat-label">总数据量</div>
+                        </div>
+                        
+                        <div class="stat-card info">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-edit"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">28,549</div>
+                            <div class="stat-label">待修改数据</div>
+                        </div>
+                        
+                        <div class="stat-card warning">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-hourglass-half"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">1,526</div>
+                            <div class="stat-label">待审核</div>
+                        </div>
+                        
+                        <div class="stat-card success">
+                            <div class="stat-header">
+                                <div class="stat-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                            </div>
+                            <div class="stat-value">10,921</div>
+                            <div class="stat-label">已通过</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 筛选和搜索 -->
+                <section class="filter-section">
+                    <div class="filter-card">
+                        <div class="filter-row">
+                            <div class="filter-group" style="flex: 1;">
+                                <label>审核状态</label>
+                                <select class="filter-select" id="statusFilter">
+                                    <option value="">全部状态</option>
+                                    <option value="pending">待审核</option>
+                                    <option value="approved">已通过</option>
+                                    <option value="rejected">需修改</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="flex: 1;">
+                                <label>质量等级</label>
+                                <select class="filter-select" id="qualityFilter">
+                                    <option value="">全部等级</option>
+                                    <option value="high">高质量</option>
+                                    <option value="medium">良好质量</option>
+                                    <option value="low">低质量</option>
+                                </select>
+                            </div>
+                            <div class="filter-group" style="flex: 2;">
+                                <label>搜索数据</label>
+                                <div class="search-box">
+                                    <input type="text" class="filter-input search-input" id="searchInput" placeholder="输入ID或关键词...">
+                                    <button class="btn btn-primary btn-sm" id="searchBtn" style="padding: 0.625rem 1rem;">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 数据表格 -->
+                <section class="table-section">
+                    <div class="table-header">
+                        <div class="table-title">
+                            <i class="fas fa-list"></i>
+                            数据列表
+                        </div>
+                        <div class="table-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="refreshData()">
+                                <i class="fas fa-sync-alt"></i> 刷新
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="exportData()">
+                                <i class="fas fa-download"></i> 导出
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="importToReview()">
+                                <i class="fas fa-arrow-right"></i> 导入审核
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                <th style="width: 60px;">
+                                    <input type="checkbox" id="selectAll" style="cursor: pointer;">
+                                </th>
+                                <th style="width: 150px;">数据ID</th>
+                                <th style="flex: 1;">问题内容</th>
+                                <th style="width: 150px;">质量分</th>
+                                <th style="width: 100px;">状态</th>
+                                <th style="width: 120px;">操作</th>
+                            </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <!-- 数据将通过JavaScript动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pagination">
+                        <div class="pagination-info">
+                            显示 <strong>1-5</strong> 条，共 <strong>12,847</strong> 条数据
+                        </div>
+                        <div class="pagination-controls">
+                            <button class="page-btn" disabled>
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn">2</button>
+                            <button class="page-btn">3</button>
+                            <button class="page-btn">4</button>
+                            <button class="page-btn">5</button>
+                            <span style="color: var(--gray-400); margin: 0 0.5rem;">...</span>
+                            <button class="page-btn">2570</button>
+                            <button class="page-btn">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 人工复审页面 -->
+    <div id="manual-review" class="page-container">
+        <div class="review-page-container">
+            <!-- 侧边栏 (已删除审核状态模块) -->
+            <div class="review-page-sidebar">
+                <!-- 统计信息区域 -->
+                <div class="review-page-sidebar-section">
+                    <h3><i class="fas fa-chart-bar"></i> 审核统计</h3>
+                    <div id="statisticsContainer" class="review-page-statistics-container">
+                        <div class="review-page-stat-item">
+                            <span class="review-page-stat-label"><i class="fas fa-database"></i> 总数</span>
+                            <span class="review-page-stat-value" id="totalCount">0</span>
+                        </div>
+                        <div class="review-page-stat-item">
+                            <span class="review-page-stat-label"><i class="fas fa-clock"></i> 待审核</span>
+                            <span class="review-page-stat-value" id="pendingCount">0</span>
+                        </div>
+                        <div class="review-page-stat-item">
+                            <span class="review-page-stat-label"><i class="fas fa-check-circle"></i> 已通过</span>
+                            <span class="review-page-stat-value" id="approvedCount">0</span>
+                        </div>
+                        <div class="review-page-stat-item">
+                            <span class="review-page-stat-label"><i class="fas fa-edit"></i> 需修改</span>
+                            <span class="review-page-stat-value" id="modifiedCount">0</span>
+                        </div>
+                        <div class="review-page-stat-progress">
+                            <div class="review-page-progress-text" id="progressText">进度: 0%</div>
+                            <div class="review-page-progress-bar">
+                                <div class="review-page-progress-fill" id="progressFill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 导入数据按钮 -->
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <button class="review-page-import-btn" id="importDataBtn" style="width: 100%; padding: 0.6rem; background: var(--primary-color); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+                            <i class="fas fa-upload"></i> 导入数据
+                        </button>
+                        <!-- 导出已通过数据按钮 -->
+                        <button class="review-page-import-btn" id="exportApprovedData" style="width: 100%; padding: 0.6rem; background: var(--primary-color); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <i class="fas fa-file-export"></i> 导出已通过数据
+                        </button>
+                    </div>
+                </div>
+                
+
+            </div>
+            
+            <!-- 主内容区 -->
+            <div class="review-page-main-content">
+
+                
+                <!-- 双栏审核界面 -->
+                <div class="review-page-review-container">
+                    <!-- 左栏：图片展示 + 原始问答 -->
+                    <div class="review-page-left-column review-page-original-qa review-page-fade-in">
+                        <div class="review-page-column-header" style="margin-bottom: 0.5rem;">
+                            <h2 style="font-size: 1.2rem; font-weight: 600;"><i class="fas fa-file-alt"></i> 原始问答</h2>
+                            <div class="review-page-qa-id" style="font-size: 0.8rem;">ID: <span id="qaId">QA-2023-0876</span></div>
+                        </div>
+                        
+                        <!-- 图片展示区域 (在上方) -->
+                        <div class="review-page-image-section" style="margin-bottom: 0.6rem;">
+                            <h3 style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-images"></i> 关联图片<span id="imageCounter" class="review-page-image-counter" style="font-size: 0.8rem;">(0/0)</span></h3>
+                            <div class="review-page-image-display" id="imageDisplay">
+                                <div class="review-page-image-placeholder" id="imagePlaceholder">
+                                    <i class="fas fa-image"></i>
+                                    <h4>暂无图片</h4>
+                                    <p>该问答对没有关联图片，或图片文件不存在</p>
+                                </div>
+
+                                <!-- 主图展示区 -->
+                                <div class="review-page-image-container" id="imageContainer" style="display: none;">
+                                    <!-- 缩略图列表 -->
+                                    <div class="review-page-thumbnail-container">
+                                        <div class="review-page-thumbnail-list" id="thumbnailList">
+                                            <!-- 缩略图将通过JavaScript动态生成 -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 原始问答内容 (在下方) -->
+                        <div class="review-page-qa-content">
+                            <div class="review-page-question-section" style="margin-bottom: 0.6rem;">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-question-circle"></i> 原始问题</h3>
+                                <div class="review-page-content-box" id="originalQuestion">
+                                    请问这张图片中的水稻叶片出现了什么病害？如何识别和防治？
+                                </div>
+                            </div>
+                            
+                            <div class="review-page-answer-section">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-comment-dots"></i> 原始答案</h3>
+                                <div class="review-page-content-box" id="originalAnswer">
+                                    根据图片显示，水稻叶片上出现椭圆形或纺锤形病斑，中央灰白色，边缘褐色，可能是水稻纹枯病。该病害由立枯丝核菌引起，多发生在高温高湿环境。防治方法包括选用抗病品种、合理密植、科学施肥，发病初期可使用井冈霉素、戊唑醇等药剂进行防治。
+                                </div>
+                            </div>
+                            
+                            <!-- 文本优化问题模态框 -->
+                            <div class="review-page-qa-content" style="margin-bottom: 0.6rem;">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-magic"></i> 文本优化问题</h3>
+                                <div class="review-page-content-box" id="textOptimizedQuestion">
+                                    根据所附图片，请诊断水稻叶片出现的病害类型，并详细说明其识别特征、发生条件及综合防治措施。
+                                </div>
+                            </div>
+                            
+                            <!-- 文本优化回答模态框 -->
+                            <div class="review-page-answer-section">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-magic"></i> 文本优化回答</h3>
+                                <div class="review-page-content-box" id="textOptimizedAnswer">
+                                    根据图片中水稻叶片的症状判断，该病害为水稻纹枯病，是由立枯丝核菌（Rhizoctonia solani）引起的一种真菌性病害。识别特征：发病初期在叶鞘上出现暗绿色水渍状小斑，逐渐扩大成椭圆形或云纹状病斑；病斑中央灰白色，边缘暗褐色，多个病斑常融合成不规则形大斑；湿度大时，病部可见白色蛛丝状菌丝体，后期形成褐色菌核；严重时叶片枯死，影响光合作用和产量。发生条件：高温高湿环境（25-32℃，相对湿度90%以上）利于病害发生；氮肥施用过多、种植过密、通风透光差加重病情；连作田块菌源积累多，发病较重。综合防治措施：农业防治：选用抗病品种；合理密植，改善通风透光条件；科学施肥，避免偏施氮肥；及时清除病残体，减少菌源。化学防治：发病初期选用井冈霉素、戊唑醇、苯醚甲环唑等药剂，隔7-10天喷一次，连续2-3次。生物防治：可使用木霉菌、芽孢杆菌等生物制剂进行防治。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右栏：优化问答 + 审核工具 -->
+                    <div class="review-page-right-column review-page-optimized-qa review-page-fade-in">
+                        <div class="review-page-column-header" style="margin-bottom: 0.75rem;">
+                            <h2 style="font-size: 1.2rem; font-weight: 600;"><i class="fas fa-magic"></i> AI优化问答</h2>
+                            <div class="status-indicator">
+                                <span class="review-page-badge review-page-badge-warning" id="statusIndicator" style="font-size: 0.8rem;">待审核</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 优化问答内容 (在上方) -->
+                        <div class="review-page-qa-content">
+                            <div class="review-page-question-section" style="margin-bottom: 0.6rem;">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-question-circle"></i> 优化后问题 <small style="font-size: 0.75rem;">(富文本编辑模式)</small></h3>
+                                <div class="review-page-content-box" id="optimizedQuestion" contenteditable="true">
+                                    根据所附图片，请诊断水稻叶片出现的病害类型，并详细说明其识别特征、发生条件及综合防治措施。
+                                </div>
+                            </div>
+                            
+                            <div class="review-page-answer-section" style="margin-bottom: 0.6rem;">
+                                <h3 class="review-page-section-label" style="font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem;"><i class="fas fa-comment-dots"></i> 优化后答案 <small style="font-size: 0.75rem;">(富文本编辑模式)</small></h3>
+                                <div class="review-page-content-box editable" id="optimizedAnswer" contenteditable="true">
+                                    根据图片中水稻叶片的症状判断，该病害为<strong>水稻纹枯病</strong>，是由立枯丝核菌（Rhizoctonia solani）引起的一种真菌性病害。
+                                    <br><br>
+                                    <strong>识别特征：</strong>
+                                    <ul>
+                                        <li>发病初期在叶鞘上出现暗绿色水渍状小斑，逐渐扩大成椭圆形或云纹状病斑</li>
+                                        <li>病斑中央灰白色，边缘暗褐色，多个病斑常融合成不规则形大斑</li>
+                                        <li>湿度大时，病部可见白色蛛丝状菌丝体，后期形成褐色菌核</li>
+                                        <li>严重时叶片枯死，影响光合作用和产量</li>
+                                    </ul>
+                                    <br>
+                                    <strong>发生条件：</strong>
+                                    <ul>
+                                        <li>高温高湿环境（25-32℃，相对湿度90%以上）利于病害发生</li>
+                                        <li>氮肥施用过多、种植过密、通风透光差加重病情</li>
+                                        <li>连作田块菌源积累多，发病较重</li>
+                                    </ul>
+                                    <br>
+                                    <strong>综合防治措施：</strong>
+                                    <ol>
+                                        <li><strong>农业防治：</strong>选用抗病品种；合理密植，改善通风透光条件；科学施肥，避免偏施氮肥；及时清除病残体，减少菌源</li>
+                                        <li><strong>化学防治：</strong>发病初期选用井冈霉素、戊唑醇、苯醚甲环唑等药剂，隔7-10天喷一次，连续2-3次</li>
+                                        <li><strong>生物防治：</strong>可使用木霉菌、芽孢杆菌等生物制剂进行防治</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 审核工具栏 (在下方) -->
+                        <div class="review-page-review-toolbar" style="margin-top: 0.6rem; padding: 0.8rem; min-height: auto;">
+                            <div class="review-page-toolbar-section" style="margin-bottom: 0.5rem;">
+                                <div class="review-page-toolbar-title" style="margin-bottom: 0.4rem; font-size: 0.85rem;"><i class="fas fa-flag"></i> 审核状态</div>
+                                <div class="review-page-status-buttons" style="gap: 0.6rem;">
+                                    <button class="review-page-status-btn approve" data-status="approve" id="approveBtn" style="padding: 0.6rem 0.5rem; min-height: 36px;">
+                                        <i class="fas fa-check"></i> 通过审核
+                                    </button>
+                                    <button class="review-page-status-btn revise" data-status="revise" id="reviseBtn" style="padding: 0.6rem 0.5rem; min-height: 36px;">
+                                        <i class="fas fa-edit"></i> 需要修改
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="review-page-toolbar-section" style="margin-bottom: 0.5rem;">
+                                <div class="review-page-toolbar-title" style="margin-bottom: 0.4rem; font-size: 0.85rem;"><i class="fas fa-tools"></i> 操作工具</div>
+                                <div class="review-page-action-tools" style="gap: 0.6rem;">
+                                    <button class="review-page-action-btn" id="prevBtn" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-arrow-left"></i> 上一个
+                                    </button>
+                                    <button class="review-page-action-btn" id="nextBtn" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-arrow-right"></i> 下一个
+                                    </button>
+                                    <button class="review-page-action-btn" id="saveBtn" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-save"></i> 保存修改
+                                    </button>
+                                    <button class="review-page-action-btn" id="resetBtn" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-undo"></i> 重置内容
+                                    </button>
+                                    <button class="review-page-action-btn" id="uploadImageButton" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-image"></i> 上传图片
+                                    </button>
+                                    <button class="review-page-action-btn primary" id="submitBtn" style="padding: 0.5rem 0.6rem; min-height: 32px;">
+                                        <i class="fas fa-paper-plane"></i> 提交审核
+                                    </button>
+                                </div>
+                                <div class="review-page-shortcut-hint" style="font-size: 0.75rem; margin-top: 0.4rem;">
+                                    <i class="fas fa-keyboard"></i> 快捷键: Ctrl+S 保存, Ctrl+Enter 提交
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 审核历史页面 -->
+    <div id="review-history" class="page-container">
+        <div class="container">
+            <div class="history-page-header">
+                <h1><i class="fas fa-history"></i> 审核历史记录</h1>
+                <p>查看所有审核历史，包括修改前后的内容对比</p>
+            </div>
+            
+            <div class="history-page-toolbar">
+                <div class="history-page-filter-section">
+                    <span class="history-page-filter-label">筛选：</span>
+                    <select id="statusFilter" class="history-page-filter-select">
+                        <option value="all">全部状态</option>
+                        <option value="approved">已通过</option>
+                        <option value="modified">需修改</option>
+                    </select>
+                    <select id="dateFilter" class="history-page-filter-select">
+                        <option value="all">全部时间</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                    </select>
+                </div>
+                <div class="history-page-action-buttons">
+                    <button id="clearHistoryBtn" class="history-page-btn history-page-btn-secondary">
+                        <i class="fas fa-trash"></i> 清空历史
+                    </button>
+                </div>
+            </div>
+            
+            <div class="history-page-history-list" id="historyList">
+                <div class="history-page-empty-state">
+                    <i class="fas fa-clock"></i>
+                    <h3>暂无审核历史记录</h3>
+                    <p>开始审核项目后，这里会显示审核历史</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast 提示容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- 加载状态 -->
+    <div id="loading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="text-align: center; background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+            <div style="width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #2E7D32; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+            <p id="loadingText" style="font-size: 1.1rem; color: #333;">加载中...</p>
+        </div>
+    </div>
+    
+    <!-- 错误提示 -->
+    <div id="error" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); z-index: 9999; text-align: center;">
+        <div style="font-size: 3rem; color: #ef4444; margin-bottom: 1rem;">❌</div>
+        <h3 style="margin-bottom: 1rem; color: #333;">操作失败</h3>
+        <p id="errorText" style="margin-bottom: 2rem; color: #666;">发生错误，请重试</p>
+        <button id="retryButton" style="padding: 0.75rem 1.5rem; background: #2E7D32; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem;">重试</button>
+    </div>
+    
+    <!-- 提问优化提示词模态框 -->
+    <div class="modal" id="questionPromptModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>提问优化提示词</h3>
+                <button class="modal-close" id="closeQuestionPromptModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="questionPrompt" class="form-control" rows="10" placeholder="输入提问优化提示词"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelQuestionPrompt">取消</button>
+                <button class="btn btn-primary" id="saveQuestionPrompt">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 回答优化提示词模态框 -->
+    <div class="modal" id="answerPromptModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>回答优化提示词</h3>
+                <button class="modal-close" id="closeAnswerPromptModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="answerPrompt" class="form-control" rows="10" placeholder="输入回答优化提示词"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelAnswerPrompt">取消</button>
+                <button class="btn btn-primary" id="saveAnswerPrompt">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 优化测试结果模态框 -->
+    <div class="modal" id="optimizeTestModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 1000; align-items: center; justify-content: center;">
+        <div class="modal-content" style="width: 90%; max-width: 900px; height: 90vh; max-height: 800px; background-color: white; border-radius: var(--radius-lg); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); display: flex; flex-direction: column;">
+            <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: var(--gray-800); font-size: 1.25rem;">优化测试结果</h3>
+                <button class="modal-close" id="closeOptimizeTestModal" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--gray-500);">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem; flex: 1; overflow: hidden;">
+                <div style="height: 100%; display: flex; flex-direction: column;">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                        <button class="btn btn-secondary btn-sm" id="btnTextModelTest" style="flex: 1; padding: 0.75rem;">文本模型</button>
+                        <button class="btn btn-primary btn-sm" id="btnVlModelTest" style="flex: 1; padding: 0.75rem;">多模态模型</button>
+                    </div>
+                    <div id="optimizeTestContent" style="border: 1px solid var(--gray-200); border-radius: var(--radius-md); padding: 1.5rem; flex: 1; overflow-y: auto; background-color: var(--gray-50);">
+                        <!-- 优化测试结果将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.5rem; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end;">
+                <button class="btn btn-secondary" id="closeOptimizeTestBtn" style="padding: 0.5rem 1.5rem;">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <!--导出已通过数据模态框 -->
+    <div id="exportModal" class="review-page-image-modal">
+        <div class="review-page-image-modal-content" style="max-width: 600px;">
+            <div class="review-page-modal-header">
+                <div class="review-page-modal-title"><i class="fas fa-file-export"></i> 导出已通过数据</div>
+                <button class="review-page-modal-close" onclick="document.getElementById('exportModal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="review-page-modal-body" style="padding: 2rem; background: white; min-height: auto;">
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--primary-dark);"><i class="fas fa-filter"></i> 筛选导出内容</h4>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="exportAll" checked onchange="toggleExportOptions()">
+                            <span>全部问答对</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="exportApproved" onchange="toggleExportOptions()">
+                            <span>已通过</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="exportModified" onchange="toggleExportOptions()">
+                            <span>需修改</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="exportPending" onchange="toggleExportOptions()">
+                            <span>待审核</span>
+                        </label>
+                    </div>
+                </div>
+                <div style="margin-bottom: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: var(--primary-dark);"><i class="fas fa-cog"></i> 导出选项</h4>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="includeImages" checked>
+                        <span>包含图片信息</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="includeMetadata" checked>
+                        <span>包含元数据</span>
+                    </label>
+                </div>
+                <div id="exportProgress" style="display: none; text-align: center; padding: 1rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i>
+                    <p style="margin-top: 1rem;">正在生成导出文件...</p>
+                </div>
+            </div>
+            <div class="review-page-modal-footer">
+                <div class="review-page-modal-nav">
+                    <button class="review-page-modal-nav-btn" onclick="document.getElementById('exportModal').classList.remove('active')">
+                        取消
+                    </button>
+                    <button class="review-page-modal-nav-btn" id="confirmExportBtn">
+                        <i class="fas fa-download"></i> 导出
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    <!-- 图片放大模态框 -->
+    <div id="imageModal" class="review-page-image-modal">
+        <div class="review-page-image-modal-content">
+            <div class="review-page-modal-header">
+                <div class="review-page-modal-title"><i class="fas fa-image"></i> 图片预览</div>
+                <button class="review-page-modal-close" onclick="document.getElementById('imageModal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="review-page-modal-body">
+                <div class="review-page-modal-image-container">
+                    <img id="modalImage" src="" alt="预览图片">
+                </div>
+            </div>
+            <div class="review-page-modal-footer">
+                <div class="review-page-modal-filename" id="modalFilename"></div>
+                <div class="review-page-modal-nav">
+                    <button class="review-page-modal-nav-btn" id="prevModalImage" disabled>
+                        <i class="fas fa-chevron-left"></i> 上一张
+                    </button>
+                    <button class="review-page-modal-nav-btn" onclick="document.getElementById('imageModal').classList.remove('active')">
+                        关闭
+                    </button>
+                    <button class="review-page-modal-nav-btn" id="nextModalImage" disabled>
+                        下一张 <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+</body>
+</html>
