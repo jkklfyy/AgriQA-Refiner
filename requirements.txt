@@ -1,0 +1,10 @@
+# 自动化回复评分系统
+
+# 安装命令：pip install -r requirements.txt
+flask>=2.3.0
+flask-cors>=4.0.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+pymysql>=1.1.0
+pandas>=2.0.0
+openpyxl>=3.1.0
